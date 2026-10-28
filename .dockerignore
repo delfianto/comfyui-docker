@@ -1,0 +1,12 @@
+.git
+.gitignore
+README.md
+compose.yaml
+data
+cache
+
+.env
+.env.*
+*.local
+build.sh
+docker-bake.hcl

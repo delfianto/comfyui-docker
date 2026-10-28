@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1.7
+FROM python:3.12-slim-bookworm
+
+ARG PROXY_VERSION=0.1.6
+
+LABEL org.opencontainers.image.source="https://github.com/Comfy-Org/comfy-api-proxy" \
+      org.opencontainers.image.version="${PROXY_VERSION}"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv venv /opt/proxy \
+    && uv pip install --python /opt/proxy/bin/python "comfy-api-proxy==${PROXY_VERSION}"
+
+ENV PATH=/opt/proxy/bin:$PATH \
+    VIRTUAL_ENV=/opt/proxy \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    HOME=/tmp
+
+WORKDIR /data
+EXPOSE 8189
+
+COPY --chmod=755 entrypoint-proxy.sh /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
