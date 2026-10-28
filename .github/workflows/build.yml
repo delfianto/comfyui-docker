@@ -1,0 +1,182 @@
+name: Build & Publish to GHCR
+
+on:
+  schedule:
+    # Check every 6 hours for new ComfyUI releases
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "ComfyUI release tag to build (leave empty for latest-stable)"
+        required: false
+        type: string
+        default: ""
+      force_rebuild:
+        description: "Force rebuild even if image tag already exists in GHCR"
+        required: false
+        type: boolean
+        default: false
+      build_base:
+        description: "Force rebuild of base image (comfyui-cuda)"
+        required: false
+        type: boolean
+        default: false
+      build_proxy:
+        description: "Build official local API proxy (comfyui-proxy)"
+        required: false
+        type: boolean
+        default: true
+  push:
+    branches:
+      - main
+    paths:
+      - "Dockerfile*"
+      - "docker-bake.hcl"
+      - "*.sh"
+      - ".github/workflows/build.yml"
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: comfyui-build-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  check-release:
+    runs-on: ubuntu-latest
+    outputs:
+      comfyui_ref: ${{ steps.resolve.outputs.comfyui_ref }}
+      needs_build: ${{ steps.resolve.outputs.needs_build }}
+      needs_base: ${{ steps.resolve.outputs.needs_base }}
+      build_proxy: ${{ steps.resolve.outputs.build_proxy }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Resolve ComfyUI release and check GHCR
+        id: resolve
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_FORCE: ${{ inputs.force_rebuild }}
+          INPUT_BASE: ${{ inputs.build_base }}
+          INPUT_PROXY: ${{ inputs.build_proxy }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -eu
+          # Ensure env exists
+          if [ ! -f .env ]; then
+            cp .env.example .env
+          fi
+
+          # 1. Determine requested ComfyUI version
+          if [ -n "$INPUT_VERSION" ]; then
+            TARGET_VERSION="$INPUT_VERSION"
+          else
+            TARGET_VERSION=$(./resolve-comfy-ref.py "https://github.com/Comfy-Org/ComfyUI.git" "latest-stable")
+          fi
+          echo "comfyui_ref=$TARGET_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Target ComfyUI release: $TARGET_VERSION"
+
+          # 2. Check if target image tag already exists in GHCR
+          IMAGE_TAG="ghcr.io/${REPO_OWNER,,}/comfyui-app:$TARGET_VERSION"
+          if [ "$INPUT_FORCE" = "true" ]; then
+            echo "Force rebuild requested."
+            echo "needs_build=true" >> "$GITHUB_OUTPUT"
+          elif docker buildx imagetools inspect "$IMAGE_TAG" >/dev/null 2>&1; then
+            echo "Image $IMAGE_TAG already exists in GHCR. No build required."
+            echo "needs_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Image $IMAGE_TAG not found in GHCR. Build required."
+            echo "needs_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          # 3. Check if base image exists in GHCR
+          BASE_TAG="ghcr.io/${REPO_OWNER,,}/comfyui-cuda:13.4.2-base-ubuntu26.04"
+          if [ "$INPUT_BASE" = "true" ]; then
+            echo "Force base rebuild requested."
+            echo "needs_base=true" >> "$GITHUB_OUTPUT"
+          elif docker buildx imagetools inspect "$BASE_TAG" >/dev/null 2>&1; then
+            echo "Base image $BASE_TAG already exists in GHCR."
+            echo "needs_base=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Base image $BASE_TAG not found in GHCR. Base build required."
+            echo "needs_base=true" >> "$GITHUB_OUTPUT"
+          fi
+
+          # 4. Proxy build flag
+          if [ "${INPUT_PROXY:-true}" = "true" ]; then
+            echo "build_proxy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_proxy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-and-push:
+    needs: check-release
+    if: needs.check-release.outputs.needs_build == 'true' || needs.check-release.outputs.needs_base == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare environment file
+        run: |
+          if [ ! -f .env ]; then
+            cp .env.example .env
+          fi
+
+      - name: Build and push Base Image
+        if: needs.check-release.outputs.needs_base == 'true'
+        run: |
+          ./build.sh --push --set '*.output=type=image,push=true' base
+
+      - name: Build and push ComfyUI Runtime Image
+        if: needs.check-release.outputs.needs_build == 'true'
+        env:
+          COMFYUI_REF: ${{ needs.check-release.outputs.comfyui_ref }}
+        run: |
+          ./build.sh --version "$COMFYUI_REF" --push --set '*.output=type=image,push=true' comfyui
+
+      - name: Build and push Local API Proxy Image
+        if: needs.check-release.outputs.build_proxy == 'true'
+        run: |
+          ./build.sh --push --set '*.output=type=image,push=true' proxy
+
+      - name: Publish Step Summary
+        run: |
+          echo "### Build & Publish Complete :rocket:" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **ComfyUI Release**: \`${{ needs.check-release.outputs.comfyui_ref }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Published Images**:" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ needs.check-release.outputs.needs_build }}" = "true" ]; then
+            echo "  - \`ghcr.io/${{ github.repository_owner }}/comfyui-app:${{ needs.check-release.outputs.comfyui_ref }}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "  - \`ghcr.io/${{ github.repository_owner }}/comfyui-app:latest\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "${{ needs.check-release.outputs.needs_base }}" = "true" ]; then
+            echo "  - \`ghcr.io/${{ github.repository_owner }}/comfyui-cuda:13.4.2-base-ubuntu26.04\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "${{ needs.check-release.outputs.build_proxy }}" = "true" ]; then
+            echo "  - \`ghcr.io/${{ github.repository_owner }}/comfyui-proxy:latest\`" >> "$GITHUB_STEP_SUMMARY"
+          fi

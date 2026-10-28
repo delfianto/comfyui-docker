@@ -65,3 +65,12 @@ With ComfyUI and the proxy running, test the API proxy and SDK connectivity:
 ```bash
 python3 smoke-test-proxy.py
 ```
+
+## GitHub Actions & Automated GHCR Publishing
+
+The repository includes [`.github/workflows/build.yml`](.github/workflows/build.yml) which automates checking and building images:
+
+- **Automated Check**: Scheduled every 6 hours via GitHub Actions cron.
+- **Release Detection**: Resolves upstream `Comfy-Org/ComfyUI`'s latest stable release. If the corresponding tag is missing in GHCR (`ghcr.io/delfianto/comfyui-app:<tag>`), it triggers the build.
+- **Manual Trigger**: Supports `workflow_dispatch` with options for `force_rebuild`, target `version`, or `build_base`.
+- **Publishing**: Pushes images directly to GitHub Container Registry (`ghcr.io`), making them immediately available for `composectl update ai-comfyui` or `docker upgrade` on your host.
