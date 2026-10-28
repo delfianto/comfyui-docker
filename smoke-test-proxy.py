@@ -14,6 +14,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from typing import Any, cast
 
 PROXY_URL = os.environ.get("COMFY_PROXY_URL", "http://127.0.0.1:8189")
 
@@ -23,8 +24,10 @@ def test_health() -> None:
     req = urllib.request.Request(f"{PROXY_URL}/api/v2/health")
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
-            assert resp.status == 200, f"Expected 200, got {resp.status}"
-            data = json.loads(resp.read().decode("utf-8"))
+            status_code = getattr(resp, "status", 200)
+            assert status_code == 200, f"Expected 200, got {status_code}"
+            raw = cast(bytes, resp.read())
+            data = cast(dict[str, object], json.loads(raw.decode("utf-8")))
             assert data.get("status") == "healthy", f"Unexpected status: {data}"
             print(f"OK (upstream: {data.get('upstream')})")
     except urllib.error.URLError as exc:
@@ -37,8 +40,10 @@ def test_jobs_endpoint() -> None:
     req = urllib.request.Request(f"{PROXY_URL}/api/v2/jobs")
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
-            assert resp.status == 200, f"Expected 200, got {resp.status}"
-            data = json.loads(resp.read().decode("utf-8"))
+            status_code = getattr(resp, "status", 200)
+            assert status_code == 200, f"Expected 200, got {status_code}"
+            raw = cast(bytes, resp.read())
+            data = cast(dict[str, object], json.loads(raw.decode("utf-8")))
             print(f"OK (jobs response keys: {list(data.keys())})")
     except urllib.error.URLError as exc:
         print(f"FAILED: {exc}")
@@ -49,15 +54,19 @@ def test_sdk() -> None:
     print(f"[3/3] Testing Comfy SDK against {PROXY_URL} ...", end=" ", flush=True)
     try:
         os.environ["COMFY_BASE_URL"] = PROXY_URL
-        from comfy_sdk import Comfy
+        from comfy_sdk import Comfy  # pyright: ignore[reportMissingImports]
 
-        client = Comfy()
-        jobs_data = client._low.list_jobs()
-        job_count = len(jobs_data.get("jobs", []))
-        print(f"OK (client connected, verified API v2 contract, {job_count} jobs listed)")
+        client: Any = Comfy()
+        jobs_data = cast(dict[str, object], client._low.list_jobs())
+        jobs_list = cast(list[object], jobs_data.get("jobs", []))
+        print(
+            f"OK (client connected, verified API v2 contract, {len(jobs_list)} jobs listed)"
+        )
     except ImportError:
-        print("SKIPPED (comfy-sdk not installed in current environment; install with 'uv pip install comfy-sdk')")
-    except Exception as exc:
+        print(
+            "SKIPPED (comfy-sdk not installed in current environment; install with 'uv pip install comfy-sdk')"
+        )
+    except Exception as exc:  # noqa: BLE001
         print(f"FAILED: {exc}")
         sys.exit(1)
 
