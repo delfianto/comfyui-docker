@@ -4,7 +4,7 @@ Multi-stage Docker builds and Docker Buildx Bake configuration for ComfyUI runti
 
 Built images:
 - **`ghcr.io/delfianto/comfyui-cuda:13.4.2-base-ubuntu26.04`**: CUDA 13.4.2, Ubuntu 26.04 LTS, Python 3.14, matched PyTorch 2.11 / TorchVision 0.26 / TorchAudio 2.11 runtime base.
-- **`ghcr.io/delfianto/comfyui-app:latest`** (and version tags, e.g. `:v0.3.60`): ComfyUI application runtime, bundled stable release, Proton DLSS compatibility support.
+- **`ghcr.io/delfianto/comfyui-app:latest`** (and version tags, e.g. `:0.43.0`): ComfyUI application runtime, bundled stable release, Proton DLSS compatibility support.
 - **`ghcr.io/delfianto/comfyui-proxy:latest`** (and `:0.1.6`): Official local API proxy exposing Comfy API v2 for SDK integration.
 
 ## Directory Layout
@@ -55,7 +55,7 @@ Build settings are configured in `.env` (copy from `.env.example`).
 | Target | Dockerfile | Output Tags | Description |
 |---|---|---|---|
 | `base` | `Dockerfile.base` | `ghcr.io/delfianto/comfyui-cuda:13.4.2-base-ubuntu26.04` | Reusable base with CUDA, Python 3.14, and Torch |
-| `comfyui` | `Dockerfile` | `ghcr.io/delfianto/comfyui-app:latest`, `:vX.Y.Z` | ComfyUI runtime with Proton DLSS |
+| `comfyui` | `Dockerfile` | `ghcr.io/delfianto/comfyui-app:latest`, `:X.Y.Z` | ComfyUI runtime with Proton DLSS |
 | `proxy` | `Dockerfile.proxy` | `ghcr.io/delfianto/comfyui-proxy:latest`, `:0.1.6` | Official local API proxy (v2 API) |
 
 ## Testing

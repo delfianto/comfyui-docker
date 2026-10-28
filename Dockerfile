@@ -26,9 +26,11 @@ RUN dpkg --add-architecture i386 \
 
 ARG COMFYUI_REPOSITORY=https://github.com/Comfy-Org/ComfyUI.git
 ARG COMFYUI_REF=latest-stable
+ARG COMFYUI_VERSION=latest
 ENV COMFYUI_REF=${COMFYUI_REF} \
+    COMFYUI_VERSION=${COMFYUI_VERSION} \
     COMFYUI_AUTO_UPDATE=false
-LABEL org.opencontainers.image.version=${COMFYUI_REF}
+LABEL org.opencontainers.image.version=${COMFYUI_VERSION}
 COPY --chmod=755 resolve-comfy-ref.py /usr/local/bin/comfy-resolve-ref
 
 RUN git init "${COMFYUI_DIR}" \

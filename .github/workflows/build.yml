@@ -48,6 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       comfyui_ref: ${{ steps.resolve.outputs.comfyui_ref }}
+      comfyui_version: ${{ steps.resolve.outputs.comfyui_version }}
       needs_build: ${{ steps.resolve.outputs.needs_build }}
       needs_base: ${{ steps.resolve.outputs.needs_base }}
       build_proxy: ${{ steps.resolve.outputs.build_proxy }}
@@ -75,17 +76,23 @@ jobs:
             cp .env.example .env
           fi
 
-          # 1. Determine requested ComfyUI version
+          # 1. Determine requested ComfyUI git ref and semantic version
           if [ -n "$INPUT_VERSION" ]; then
-            TARGET_VERSION="$INPUT_VERSION"
+            RAW_REF="$INPUT_VERSION"
           else
-            TARGET_VERSION=$(./resolve-comfy-ref.py "https://github.com/Comfy-Org/ComfyUI.git" "latest-stable")
+            RAW_REF=$(./resolve-comfy-ref.py "https://github.com/Comfy-Org/ComfyUI.git" "latest-stable")
           fi
-          echo "comfyui_ref=$TARGET_VERSION" >> "$GITHUB_OUTPUT"
-          echo "Target ComfyUI release: $TARGET_VERSION"
+          # Git ref for cloning (e.g. v0.43.0 or branch)
+          COMFYUI_REF="$RAW_REF"
+          # Pure semantic version without leading 'v' (e.g. 0.43.0)
+          COMFYUI_VERSION="${RAW_REF#v}"
 
-          # 2. Check if target image tag already exists in GHCR
-          IMAGE_TAG="ghcr.io/${REPO_OWNER,,}/comfyui-app:$TARGET_VERSION"
+          echo "comfyui_ref=$COMFYUI_REF" >> "$GITHUB_OUTPUT"
+          echo "comfyui_version=$COMFYUI_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Target ComfyUI ref: $COMFYUI_REF, semantic version: $COMFYUI_VERSION"
+
+          # 2. Check if target image tag already exists in GHCR (tag is semantic version without 'v')
+          IMAGE_TAG="ghcr.io/${REPO_OWNER,,}/comfyui-app:$COMFYUI_VERSION"
           if [ "$INPUT_FORCE" = "true" ]; then
             echo "Force rebuild requested."
             echo "needs_build=true" >> "$GITHUB_OUTPUT"
@@ -168,10 +175,10 @@ jobs:
       - name: Publish Step Summary
         run: |
           echo "### Build & Publish Complete :rocket:" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **ComfyUI Release**: \`${{ needs.check-release.outputs.comfyui_ref }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **ComfyUI Release**: \`${{ needs.check-release.outputs.comfyui_ref }}\` (semantic version: \`${{ needs.check-release.outputs.comfyui_version }}\`)" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Published Images**:" >> "$GITHUB_STEP_SUMMARY"
           if [ "${{ needs.check-release.outputs.needs_build }}" = "true" ]; then
-            echo "  - \`ghcr.io/${{ github.repository_owner }}/comfyui-app:${{ needs.check-release.outputs.comfyui_ref }}\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "  - \`ghcr.io/${{ github.repository_owner }}/comfyui-app:${{ needs.check-release.outputs.comfyui_version }}\`" >> "$GITHUB_STEP_SUMMARY"
             echo "  - \`ghcr.io/${{ github.repository_owner }}/comfyui-app:latest\`" >> "$GITHUB_STEP_SUMMARY"
           fi
           if [ "${{ needs.check-release.outputs.needs_base }}" = "true" ]; then

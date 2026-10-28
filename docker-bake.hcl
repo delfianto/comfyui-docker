@@ -44,6 +44,11 @@ variable "COMFYUI_REF" {
   default = "latest-stable"
 }
 
+variable "COMFYUI_VERSION" {
+  type    = string
+  default = "latest"
+}
+
 variable "IMAGE_PROXY_NAME" {
   type    = string
   default = "ghcr.io/delfianto/comfyui-proxy"
@@ -78,11 +83,12 @@ target "comfyui" {
   context    = "."
   dockerfile = "Dockerfile"
   platforms  = ["linux/amd64"]
-  tags       = ["${IMAGE_NAME}:latest", "${IMAGE_NAME}:${COMFYUI_REF}"]
+  tags       = ["${IMAGE_NAME}:latest", "${IMAGE_NAME}:${COMFYUI_VERSION}"]
   args = {
     BASE_IMAGE         = BASE_IMAGE
     COMFYUI_REPOSITORY = COMFYUI_REPOSITORY
     COMFYUI_REF        = COMFYUI_REF
+    COMFYUI_VERSION    = COMFYUI_VERSION
   }
   output = ["type=docker"]
 }

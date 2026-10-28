@@ -61,14 +61,15 @@ if [ "$needs_version" = true ]; then
             ;;
     esac
     COMFYUI_REF=$(python3 ./resolve-comfy-ref.py "$COMFYUI_REPOSITORY" "$requested_version")
-    export COMFYUI_REF
+    COMFYUI_VERSION=${COMFYUI_REF#v}
+    export COMFYUI_REF COMFYUI_VERSION
     # Fail before building if an explicit release tag does not exist.
     if [ "$requested_version" != latest-stable ]; then
         refs=$(git ls-remote --exit-code --tags "$COMFYUI_REPOSITORY" "refs/tags/$COMFYUI_REF")
         [ -n "$refs" ]
     fi
-    printf 'Building ComfyUI %s as %s:latest and %s:%s\n' \
-        "$COMFYUI_REF" "$IMAGE_NAME" "$IMAGE_NAME" "$COMFYUI_REF" >&2
+    printf 'Building ComfyUI %s (version %s) as %s:latest and %s:%s\n' \
+        "$COMFYUI_REF" "$COMFYUI_VERSION" "$IMAGE_NAME" "$IMAGE_NAME" "$COMFYUI_VERSION" >&2
 fi
 for arg do
     case "$arg" in
