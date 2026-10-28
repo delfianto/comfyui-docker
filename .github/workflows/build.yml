@@ -71,11 +71,6 @@ jobs:
           REPO_OWNER: ${{ github.repository_owner }}
         run: |
           set -eu
-          # Ensure env exists
-          if [ ! -f .env ]; then
-            cp .env.example .env
-          fi
-
           # 1. Determine requested ComfyUI git ref and semantic version
           if [ -n "$INPUT_VERSION" ]; then
             RAW_REF="$INPUT_VERSION"
@@ -148,12 +143,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Prepare environment file
-        run: |
-          if [ ! -f .env ]; then
-            cp .env.example .env
-          fi
 
       - name: Build and push Base Image
         if: needs.check-release.outputs.needs_base == 'true'

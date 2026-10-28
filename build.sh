@@ -11,6 +11,9 @@ if [ -f .env.local ]; then
 fi
 set +a
 
+COMFYUI_REPOSITORY="${COMFYUI_REPOSITORY:-https://github.com/Comfy-Org/ComfyUI.git}"
+IMAGE_NAME="${IMAGE_NAME:-ghcr.io/delfianto/comfyui-app}"
+
 # Remove our option while preserving all remaining Bake arguments and quoting.
 requested_version=latest-stable
 needs_version=true

@@ -21,14 +21,13 @@ Built images:
 ├── init-dlss-prefix.sh       # Proton DLSS prefix initializer
 ├── resolve-comfy-ref.py      # Upstream release resolver
 ├── smoke-test-proxy.py       # Proxy and SDK validation script
-├── .env.example              # Build configuration template
 ├── .dockerignore
 └── README.md
 ```
 
 ## Building Images
 
-Build settings are configured in `.env` (copy from `.env.example`).
+Build settings are configured with sane defaults in `docker-bake.hcl`. Optional local overrides can be placed in `.env.local`.
 
 ```bash
 # Build the reusable CUDA/Torch base image (run once or when updating CUDA/PyTorch)
