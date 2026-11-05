@@ -5,8 +5,10 @@ FROM ${BASE_IMAGE}
 
 # Host CachyOS Proton supplies Wine/DXVK/vkd3d/NVAPI through a read-only bind.
 # Keep Linux libraries in the Ubuntu image and Wine state in a separate prefix.
+# MediaPipe's native library links against EGL and OpenGL ES, even for CPU tasks.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        libegl1 libgles2 \
         xvfb xauth vulkan-tools libvulkan1 \
         libx11-6 libxext6 libxrender1 libxrandr2 libxi6 libxcursor1 libxinerama1 \
         libfontconfig1 libfreetype6 fonts-liberation libasound2t64 libpulse0 \

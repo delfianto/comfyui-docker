@@ -65,6 +65,18 @@ With ComfyUI and the proxy running, test the API proxy and SDK connectivity:
 python3 smoke-test-proxy.py
 ```
 
+## MediaPipe runtime libraries
+
+The ComfyUI application image installs `libegl1` and `libgles2`. MediaPipe's native library requires both `libEGL.so.1` and `libGLESv2.so.2`, including when running CPU tasks.
+
+If an older image reports either library missing, rebuild the application image and recreate the ComfyUI container:
+
+```bash
+./build.sh comfyui
+```
+
+This change does not require rebuilding the CUDA/PyTorch base. A temporary installation inside an existing container (`apt-get update && apt-get install -y --no-install-recommends libegl1 libgles2`) is lost when that container is recreated.
+
 ## GitHub Actions & Automated GHCR Publishing
 
 The repository includes [`.github/workflows/build.yml`](.github/workflows/build.yml) which automates checking and building images:
